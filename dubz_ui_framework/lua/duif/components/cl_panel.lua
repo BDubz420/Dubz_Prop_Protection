@@ -1,40 +1,69 @@
+--[[
+    DUIF - Dubz UI Framework
+    File: cl_panel.lua
+    Purpose: Base container builders including themed frame and generic panel.
+]]
+
 DUIF = DUIF or {}
 
-function DUIF.CreateFrame(title, width, height)
+function DUIF.CreateFrame(title, width, height, opts)
+    opts = DUIF.MergeOptions({
+        rounded = 10,
+        draggable = true,
+        showClose = true,
+        onClose = nil
+    }, opts)
+
     local frame = vgui.Create("DFrame")
     frame:SetTitle("")
     frame:SetSize(width or 900, height or 620)
     frame:Center()
+    frame:SetDraggable(opts.draggable)
     frame:MakePopup()
     frame:ShowCloseButton(false)
+
+    frame.Title = title or "DUIF Frame"
+
     frame.Paint = function(self, w, h)
-        DUIF.DrawShadowedPanel(0, 0, w, h, 10, DUIF.Theme.Background)
-        DUIF.DrawRoundedBox(10, 0, 0, w, 52, DUIF.Theme.Panel)
-        draw.SimpleText(title or "DUIF Frame", "DUIF.Subtitle", 16, 26, DUIF.Theme.TextPrimary, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        surface.SetDrawColor(DUIF.Theme.Outline)
-        surface.DrawLine(0, 52, w, 52)
+        DUIF.DrawShadowedPanel(0, 0, w, h, opts.rounded, DUIF.GetColor("Background"))
+        DUIF.DrawRoundedBox(opts.rounded, 0, 0, w, 56, DUIF.GetColor("Surface"))
+        surface.SetDrawColor(DUIF.GetColor("Border"))
+        surface.DrawLine(0, 56, w, 56)
+        draw.SimpleText(self.Title, "DUIF.Header", 16, 28, DUIF.GetColor("Text"), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     end
 
-    local close = DUIF.CreateCloseButton(frame)
-    close:SetPos(frame:GetWide() - 42, 10)
+    if opts.showClose then
+        local close = DUIF.CreateCloseButton(frame, {
+            onClick = function()
+                if isfunction(opts.onClose) then opts.onClose(frame) end
+                frame:Remove()
+            end
+        })
+        close:SetPos(frame:GetWide() - 38, 10)
+    end
 
-    DUIF.FadeIn(frame, 0.2)
+    DUIF.Fade(frame, 0, 255, 0.16)
     return frame
 end
 
-function DUIF.CreatePanel(parent, dock, margin)
+function DUIF.CreatePanel(parent, opts)
+    opts = DUIF.MergeOptions({
+        dock = nil,
+        margin = nil,
+        rounded = 8,
+        color = nil,
+        padding = 10
+    }, opts)
+
     local panel = vgui.Create("DPanel", parent)
+    panel:DockPadding(opts.padding, opts.padding, opts.padding, opts.padding)
+
     panel.Paint = function(_, w, h)
-        DUIF.DrawRoundedBox(8, 0, 0, w, h, DUIF.Theme.Panel)
+        DUIF.DrawRoundedBox(opts.rounded, 0, 0, w, h, opts.color or DUIF.GetColor("Surface"))
     end
 
-    if dock then
-        panel:Dock(dock)
-    end
-
-    if margin then
-        panel:DockMargin(margin[1], margin[2], margin[3], margin[4])
-    end
+    if opts.dock then panel:Dock(opts.dock) end
+    if opts.margin then panel:DockMargin(opts.margin[1], opts.margin[2], opts.margin[3], opts.margin[4]) end
 
     return panel
 end

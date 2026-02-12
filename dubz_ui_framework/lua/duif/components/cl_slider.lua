@@ -1,27 +1,66 @@
+--[[
+    DUIF - Dubz UI Framework
+    File: cl_slider.lua
+    Purpose: Lightweight themed slider with smooth value animation and callbacks.
+]]
+
 DUIF = DUIF or {}
 
-function DUIF.CreateSlider(parent, min, max)
-    local slider = vgui.Create("DNumSlider", parent)
-    slider:SetMin(min or 0)
-    slider:SetMax(max or 100)
-    slider:SetDecimals(0)
-    slider:SetTall(36)
-    slider:SetText("")
+function DUIF.CreateSlider(parent, min, max, opts)
+    opts = DUIF.MergeOptions({
+        tall = 40,
+        rounded = 8,
+        default = min or 0,
+        onChanged = nil
+    }, opts)
 
-    slider.Slider.Paint = function(s, w, h)
-        local frac = (slider:GetValue() - slider:GetMin()) / (slider:GetMax() - slider:GetMin())
-        frac = math.Clamp(frac, 0, 1)
+    local pnl = vgui.Create("DPanel", parent)
+    pnl:SetTall(opts.tall)
+    pnl.Min = min or 0
+    pnl.Max = max or 100
+    pnl.Value = math.Clamp(opts.default, pnl.Min, pnl.Max)
+    pnl.HoverFrac = 0
 
-        DUIF.DrawRoundedBox(4, 0, h * 0.5 - 2, w, 4, Color(80, 95, 130))
-        DUIF.DrawGradient(0, h * 0.5 - 2, w * frac, 4, DUIF.Theme.Accent, DUIF.Theme.AccentAlt, true)
+    local slider = vgui.Create("DSlider", pnl)
+    slider:Dock(FILL)
 
-        local knobX = w * frac
-        DUIF.DrawRoundedBox(8, knobX - 7, h * 0.5 - 7, 14, 14, Color(230, 235, 255))
+    slider.Knob.Paint = function(self, w, h)
+        DUIF.DrawRoundedBox(7, 0, 0, w, h, Color(238, 243, 255))
     end
 
-    slider.TextArea:SetVisible(false)
-    slider.Label:SetFont("DUIF.Small")
-    slider.Label:SetTextColor(DUIF.Theme.TextSecondary)
-    slider.Label:SetText("Value")
-    return slider
+    slider:SetSlideX((pnl.Value - pnl.Min) / math.max(1, (pnl.Max - pnl.Min)))
+
+    function pnl:SetValue(v, noCallback)
+        self.Value = math.Clamp(v, self.Min, self.Max)
+        local frac = (self.Value - self.Min) / math.max(1, (self.Max - self.Min))
+        slider:SetSlideX(frac)
+
+        if not noCallback then
+            if isfunction(self.OnChanged) then self:OnChanged(self.Value) end
+            if isfunction(opts.onChanged) then opts.onChanged(self, self.Value) end
+        end
+    end
+
+    function pnl:GetValue()
+        return self.Value
+    end
+
+    slider.TranslateValues = function(_, x)
+        local value = pnl.Min + (x * (pnl.Max - pnl.Min))
+        value = math.Round(value, 2)
+        pnl:SetValue(value)
+        return x, 0.5
+    end
+
+    pnl.Paint = function(self, w, h)
+        local frac = (self.Value - self.Min) / math.max(1, (self.Max - self.Min))
+        local lineY = h * 0.5
+
+        DUIF.DrawRoundedBox(2, 10, lineY - 2, w - 20, 4, ColorAlpha(DUIF.GetColor("Border"), 180))
+        DUIF.DrawGradient(10, lineY - 2, (w - 20) * frac, 4, DUIF.GetColor("Accent"), DUIF.GetColor("AccentAlt"), true)
+
+        draw.SimpleText(string.format("%s", self.Value), "DUIF.Small", w - 2, 2, DUIF.GetColor("TextMuted"), TEXT_ALIGN_RIGHT)
+    end
+
+    return pnl
 end

@@ -1,116 +1,168 @@
+--[[
+    DUIF - Dubz UI Framework
+    File: cl_showcase.lua
+    Purpose: Interactive showcase panel for DUIF components and usage snippets.
+]]
+
 DUIF = DUIF or {}
 
-local function sectionHeader(parent, title, description)
-    local pnl = vgui.Create("DPanel", parent)
-    pnl:Dock(TOP)
-    pnl:SetTall(54)
-    pnl:DockMargin(0, 0, 0, 8)
-    pnl.Paint = function(_, w, h)
-        draw.SimpleText(title, "DUIF.Subtitle", 0, 2, DUIF.Theme.TextPrimary, TEXT_ALIGN_LEFT)
-        draw.SimpleText(description or "", "DUIF.Small", 0, 30, DUIF.Theme.TextSecondary, TEXT_ALIGN_LEFT)
+local function section(parent, title, desc)
+    local p = vgui.Create("DPanel", parent)
+    p:Dock(TOP)
+    p:SetTall(56)
+    p:DockMargin(0, 0, 0, 6)
+    p.Paint = function(_, w, h)
+        draw.SimpleText(title, "DUIF.Header", 0, 4, DUIF.GetColor("Text"), TEXT_ALIGN_LEFT)
+        draw.SimpleText(desc or "", "DUIF.Small", 0, 32, DUIF.GetColor("TextMuted"), TEXT_ALIGN_LEFT)
     end
-
-    return pnl
+    return p
 end
 
-local function codeBlock(parent, code)
-    local pnl = vgui.Create("DPanel", parent)
-    pnl:Dock(TOP)
-    pnl:SetTall(48)
-    pnl:DockMargin(0, 6, 0, 12)
-    pnl.Paint = function(self, w, h)
-        DUIF.DrawRoundedBox(8, 0, 0, w, h, DUIF.Theme.Background)
-        draw.SimpleText(code, "DUIF.Mono", 10, h * 0.5, DUIF.Theme.TextSecondary, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+local function snippet(parent, code)
+    local p = vgui.Create("DPanel", parent)
+    p:Dock(TOP)
+    p:SetTall(44)
+    p:DockMargin(0, 0, 0, 12)
+    p.Paint = function(_, w, h)
+        DUIF.DrawRoundedBox(8, 0, 0, w, h, DUIF.GetColor("Background"))
+        draw.SimpleText(code, "DUIF.Mono", 10, h * 0.5, DUIF.GetColor("TextMuted"), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     end
-
-    return pnl
+    return p
 end
 
-local function buildShowcase(frame)
-    local sidebar = DUIF.CreateSidebar(frame)
-    local contentWrap = vgui.Create("DPanel", frame)
-    contentWrap:Dock(FILL)
-    contentWrap:DockMargin(12, 60, 12, 12)
-    contentWrap.Paint = nil
+local function createButtonDemo(parent)
+    section(parent, "Buttons", "All styles with hover/press animations and callbacks")
 
-    local scroller = vgui.Create("DScrollPanel", contentWrap)
-    scroller:Dock(FILL)
+    local row = vgui.Create("DPanel", parent)
+    row:Dock(TOP)
+    row:SetTall(40)
+    row:DockMargin(0, 0, 0, 8)
+    row.Paint = nil
 
-    sidebar:AddItem("Default Theme", function() DUIF.SetTheme("default") end)
-    sidebar:AddItem("Purple Theme", function() DUIF.SetTheme("purple") end)
-
-    sectionHeader(scroller, "Buttons", "Primary, secondary, danger, success, ghost, gradient styles")
-    local buttonRow = vgui.Create("DPanel", scroller)
-    buttonRow:Dock(TOP)
-    buttonRow:SetTall(40)
-    buttonRow.Paint = nil
-
-    local styles = { "primary", "secondary", "danger", "success", "ghost", "gradient" }
-    for _, style in ipairs(styles) do
-        local btn = DUIF.CreateButton(buttonRow, style, style)
-        btn:Dock(LEFT)
-        btn:DockMargin(0, 0, 8, 0)
-        btn:SetWide(112)
+    for _, st in ipairs({ "primary", "secondary", "danger", "success", "ghost", "gradient" }) do
+        local b = DUIF.CreateButton(row, st, st)
+        b:Dock(LEFT)
+        b:DockMargin(0, 0, 8, 0)
+        b:SetWide(112)
+        b.OnClick = function() chat.AddText(DUIF.GetColor("Accent"), "[DUIF] ", DUIF.GetColor("Text"), "Clicked style: " .. st) end
     end
 
-    codeBlock(scroller, 'DUIF.CreateButton(parent, "Confirm", "primary")')
+    snippet(parent, 'local b = DUIF.CreateButton(parent, "Click Me", "primary")')
+end
 
-    sectionHeader(scroller, "Toggle", "Animated toggle with OnChanged callback")
-    local toggleContainer = DUIF.CreatePanel(scroller, TOP)
-    toggleContainer:SetTall(48)
-    toggleContainer:DockMargin(0, 0, 0, 6)
+local function createInputDemo(parent)
+    section(parent, "Inputs", "Text entry, slider, dropdown and modern toggle")
 
-    local toggle = DUIF.CreateToggle(toggleContainer, true)
-    toggle:SetPos(10, 10)
-    toggle.OnChanged = function(val)
-        chat.AddText(DUIF.Theme.AccentAlt, "DUIF Toggle: ", DUIF.Theme.TextPrimary, tostring(val))
-    end
-
-    codeBlock(scroller, "local t = DUIF.CreateToggle(panel, true)")
-
-    sectionHeader(scroller, "Inputs", "Text entry, slider, dropdown")
-    local inputCard = DUIF.CreateCard(scroller, {
-        header = "Input Examples",
-        description = "Styled interactive controls",
-        accentBorder = true,
-        tall = 150
+    local card = DUIF.CreateCard(parent, {
+        tall = 190,
+        header = "Live Test Area",
+        description = "Interact with all controls below",
+        accentBorder = true
     })
 
-    local txt = DUIF.CreateTextEntry(inputCard, "Type command or value...")
-    txt:SetPos(12, 60)
-    txt:SetSize(260, 32)
+    local entry = DUIF.CreateTextEntry(card, "Type here and press enter...", {
+        onEnter = function(_, value)
+            chat.AddText(DUIF.GetColor("AccentAlt"), "[Entry] ", DUIF.GetColor("Text"), value)
+        end
+    })
+    entry:SetPos(12, 64)
+    entry:SetSize(280, 34)
 
-    local slider = DUIF.CreateSlider(inputCard, 0, 100)
-    slider:SetPos(282, 58)
-    slider:SetSize(260, 32)
+    local slider = DUIF.CreateSlider(card, 0, 100, {
+        default = 35,
+        onChanged = function(_, value)
+            card.Description = "Slider: " .. math.Round(value, 1)
+        end
+    })
+    slider:SetPos(304, 60)
+    slider:SetSize(260, 42)
 
-    local combo = DUIF.CreateDropdown(inputCard, { "Teal", "Purple", "Blue" })
-    combo:SetPos(552, 60)
-    combo:SetSize(180, 32)
+    local dropdown = DUIF.CreateDropdown(card, { "Alpha", "Bravo", "Charlie", "Delta" }, {
+        onSelect = function(_, _, value)
+            chat.AddText(DUIF.GetColor("AccentBlue"), "[Dropdown] ", DUIF.GetColor("Text"), value)
+        end
+    })
+    dropdown:SetPos(576, 64)
+    dropdown:SetSize(200, 34)
 
-    codeBlock(scroller, "DUIF.CreateTextEntry / CreateSlider / CreateDropdown")
+    local toggle = DUIF.CreateToggle(card, true, {
+        onChanged = function(_, v)
+            chat.AddText(DUIF.GetColor("Success"), "[Toggle] ", DUIF.GetColor("Text"), tostring(v))
+        end
+    })
+    toggle:SetPos(790, 67)
 
-    sectionHeader(scroller, "Cards", "Rounded premium card layout with optional icon")
-    local card = DUIF.CreateCard(scroller, {
-        header = "Server Overview",
-        description = "Player count, economy and status widgets can go here.",
+    snippet(parent, "DUIF.CreateTextEntry / CreateSlider / CreateDropdown / CreateToggle")
+end
+
+local function createLayoutDemo(parent)
+    section(parent, "Cards + Close Button", "Card component with icon and standalone close button")
+
+    local row = vgui.Create("DPanel", parent)
+    row:Dock(TOP)
+    row:SetTall(110)
+    row:DockMargin(0, 0, 0, 12)
+    row.Paint = nil
+
+    local card = DUIF.CreateCard(row, {
+        dock = LEFT,
+        margin = {0, 0, 8, 0},
+        tall = 110,
+        header = "Server Status",
+        description = "128 players online • 65 tick • Premium theme",
         icon = "◆",
-        accentBorder = true,
-        tall = 96
+        accentBorder = true
     })
-    card:DockMargin(0, 0, 0, 8)
+    card:SetWide(540)
 
-    codeBlock(scroller, "DUIF.CreateCard(parent, { header = 'Title', accentBorder = true })")
+    local closeDemo = DUIF.CreatePanel(row, { dock = FILL, padding = 8 })
+    local lbl = vgui.Create("DLabel", closeDemo)
+    lbl:SetFont("DUIF.Body")
+    lbl:SetTextColor(DUIF.GetColor("Text"))
+    lbl:SetText("Close button demo")
+    lbl:SizeToContents()
+    lbl:SetPos(12, 14)
+
+    local close = DUIF.CreateCloseButton(closeDemo, {
+        onClick = function(btn)
+            local p = btn:GetParent()
+            DUIF.Fade(p, 255, 0, 0.2, function(pp)
+                pp:SetAlpha(255)
+            end)
+        end
+    })
+    close:SetPos(12, 42)
+
+    snippet(parent, "DUIF.CreateCard(...) and DUIF.CreateCloseButton(parent)")
 end
 
 function DUIF.OpenShowcase()
-    if IsValid(DUIF.ShowcaseFrame) then
-        DUIF.ShowcaseFrame:Remove()
+    if IsValid(DUIF.ShowcaseFrame) then DUIF.ShowcaseFrame:Remove() end
+
+    local frame = DUIF.CreateFrame("DUIF Showcase", 1120, 760)
+    DUIF.ShowcaseFrame = frame
+
+    local sidebar = DUIF.CreateSidebar(frame, { width = 210 })
+    sidebar:AddItem("Dark", function() DUIF.SetTheme("dark") end, "secondary")
+    sidebar:AddItem("Light", function() DUIF.SetTheme("light") end, "secondary")
+    sidebar:AddItem("Neon", function() DUIF.SetTheme("neon") end, "secondary")
+
+    local body = vgui.Create("DScrollPanel", frame)
+    body:Dock(FILL)
+    body:DockMargin(12, 64, 12, 12)
+
+    local head = vgui.Create("DPanel", body)
+    head:Dock(TOP)
+    head:SetTall(72)
+    head:DockMargin(0, 0, 0, 10)
+    head.Paint = function(_, w, h)
+        draw.SimpleText("Dubz UI Framework", "DUIF.Title", 0, 0, DUIF.GetColor("Text"), TEXT_ALIGN_LEFT)
+        draw.SimpleText("Reusable Derma toolkit with modular components, themes, and animations.", "DUIF.Body", 0, 38, DUIF.GetColor("TextMuted"), TEXT_ALIGN_LEFT)
     end
 
-    local frame = DUIF.CreateFrame("DUIF Showcase / UI Wiki", 1024, 720)
-    DUIF.ShowcaseFrame = frame
-    buildShowcase(frame)
+    createButtonDemo(body)
+    createInputDemo(body)
+    createLayoutDemo(body)
 end
 
 concommand.Add("duif_showcase", function()

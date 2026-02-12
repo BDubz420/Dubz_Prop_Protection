@@ -1,57 +1,77 @@
+--[[
+    DUIF - Dubz UI Framework
+    File: cl_button.lua
+    Purpose: Styled animated button component with multiple visual variants.
+]]
+
 DUIF = DUIF or {}
 
-local styleColor = function(style)
-    local t = DUIF.Theme
-    local map = {
-        primary = t.Accent,
-        secondary = t.PanelLight,
-        danger = t.Danger,
-        success = t.Success,
-        ghost = ColorAlpha(t.TextPrimary, 20),
-        gradient = t.Accent
+local function getStyleBase(style)
+    local colors = {
+        primary = DUIF.GetColor("Accent"),
+        secondary = DUIF.GetColor("SurfaceAlt"),
+        danger = DUIF.GetColor("Danger"),
+        success = DUIF.GetColor("Success"),
+        ghost = ColorAlpha(DUIF.GetColor("Text"), 25),
+        gradient = DUIF.GetColor("Accent")
     }
 
-    return map[style or "primary"] or t.Accent
+    return colors[style] or colors.primary
 end
 
-function DUIF.CreateButton(parent, text, style)
+function DUIF.CreateButton(parent, text, style, opts)
+    opts = DUIF.MergeOptions({
+        tall = 36,
+        rounded = 8,
+        paddingX = 14,
+        onClick = nil,
+        icon = nil
+    }, opts)
+
     local btn = vgui.Create("DButton", parent)
     btn:SetText("")
-    btn:SetTall(34)
+    btn:SetTall(opts.tall)
+    btn.Label = text or "Button"
     btn.Style = style or "primary"
-    btn.Text = text or "Button"
     btn.HoverFrac = 0
     btn.PressFrac = 0
-    btn.RippleFrac = 0
+
+    btn.DoClick = function(self)
+        if isfunction(self.OnClick) then self:OnClick() end
+        if isfunction(opts.onClick) then opts.onClick(self) end
+    end
 
     btn.Paint = function(self, w, h)
         self.HoverFrac = Lerp(FrameTime() * 12, self.HoverFrac, self:IsHovered() and 1 or 0)
-        self.PressFrac = Lerp(FrameTime() * 18, self.PressFrac, self:IsDown() and 1 or 0)
-        self.RippleFrac = Lerp(FrameTime() * 9, self.RippleFrac, self:IsHovered() and 1 or 0)
+        self.PressFrac = Lerp(FrameTime() * 16, self.PressFrac, self:IsDown() and 1 or 0)
 
-        local base = styleColor(self.Style)
-        local target = DUIF.LerpColor(self.HoverFrac, base, Color(255, 255, 255, 255))
-        local bg = DUIF.LerpColor(0.15, base, target)
+        local base = getStyleBase(self.Style)
+        local hoverTint = DUIF.LerpColor(self.HoverFrac * 0.25, base, Color(255, 255, 255))
+
+        local drawW = w * (1 - 0.02 * self.PressFrac)
+        local drawH = h * (1 - 0.06 * self.PressFrac)
+        local x = (w - drawW) * 0.5
+        local y = (h - drawH) * 0.5
 
         if self.Style == "gradient" then
-            DUIF.DrawRoundedBox(8, 0, 0, w, h, DUIF.Theme.PanelLight)
-            DUIF.DrawGradient(1, 1, w - 2, h - 2, DUIF.Theme.Accent, DUIF.Theme.AccentAlt, true)
+            DUIF.DrawRoundedBox(opts.rounded, x, y, drawW, drawH, DUIF.GetColor("SurfaceAlt"))
+            DUIF.DrawGradient(x + 1, y + 1, drawW - 2, drawH - 2, DUIF.GetColor("Accent"), DUIF.GetColor("AccentAlt"), true)
         else
-            DUIF.DrawRoundedBox(8, 0, 0, w, h, bg)
+            DUIF.DrawRoundedBox(opts.rounded, x, y, drawW, drawH, hoverTint)
         end
 
-        if self.RippleFrac > 0.01 then
-            local highlightW = w * 0.35
-            local x = (w + highlightW) * self.RippleFrac - highlightW
-            surface.SetDrawColor(255, 255, 255, 14)
-            surface.DrawRect(x, 0, highlightW, h)
+        if self.HoverFrac > 0.02 then
+            surface.SetDrawColor(255, 255, 255, 12 + (22 * self.HoverFrac))
+            surface.DrawRect(x + 3, y + 3, drawW - 6, 3)
         end
 
-        if self.PressFrac > 0.01 then
-            DUIF.DrawRoundedBox(8, 0, 0, w, h, Color(0, 0, 0, 40 * self.PressFrac))
+        local tx = w * 0.5
+        if opts.icon then
+            draw.SimpleText(opts.icon, "DUIF.Body", tx - 24, h * 0.5, DUIF.GetColor("Text"), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText(self.Label, "DUIF.Body", tx + 8, h * 0.5, DUIF.GetColor("Text"), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        else
+            draw.SimpleText(self.Label, "DUIF.Body", tx, h * 0.5, DUIF.GetColor("Text"), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
-
-        draw.SimpleText(self.Text, "DUIF.Body", w * 0.5, h * 0.5 + self.PressFrac, DUIF.Theme.TextPrimary, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
 
     return btn

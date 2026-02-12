@@ -1,32 +1,46 @@
+--[[
+    DUIF - Dubz UI Framework
+    File: cl_closebutton.lua
+    Purpose: Minimal close control with red hover fade and press scale.
+]]
+
 DUIF = DUIF or {}
 
-function DUIF.CreateCloseButton(parent)
-    local close = vgui.Create("DButton", parent)
-    close:SetText("")
-    close:SetSize(28, 28)
-    close.HoverFrac = 0
+function DUIF.CreateCloseButton(parent, opts)
+    opts = DUIF.MergeOptions({
+        w = 26,
+        h = 26,
+        onClick = nil
+    }, opts)
 
-    close.DoClick = function(self)
-        local p = self:GetParent()
-        if IsValid(p) then
-            p:AlphaTo(0, 0.1, 0, function()
-                if IsValid(p) then p:Remove() end
-            end)
+    local btn = vgui.Create("DButton", parent)
+    btn:SetText("")
+    btn:SetSize(opts.w, opts.h)
+    btn.HoverFrac = 0
+    btn.PressFrac = 0
+
+    btn.DoClick = function(self)
+        if isfunction(opts.onClick) then
+            opts.onClick(self)
+        else
+            local p = self:GetParent()
+            if IsValid(p) then p:Remove() end
         end
     end
 
-    close.Paint = function(self, w, h)
-        self.HoverFrac = Lerp(FrameTime() * 12, self.HoverFrac, self:IsHovered() and 1 or 0)
-        local size = 1 + (0.05 * self.HoverFrac)
-        local x = (w * (1 - size)) * 0.5
-        local y = (h * (1 - size)) * 0.5
+    btn.Paint = function(self, w, h)
+        self.HoverFrac = Lerp(FrameTime() * 14, self.HoverFrac, self:IsHovered() and 1 or 0)
+        self.PressFrac = Lerp(FrameTime() * 16, self.PressFrac, self:IsDown() and 1 or 0)
 
-        DUIF.DrawRoundedBox(6, x, y, w * size, h * size, Color(220, 70, 70, 20 + 70 * self.HoverFrac))
+        local scale = 1 - (self.PressFrac * 0.06)
+        local dw, dh = w * scale, h * scale
+        local x, y = (w - dw) * 0.5, (h - dh) * 0.5
 
-        surface.SetDrawColor(230, 235, 255, 180 + 75 * self.HoverFrac)
-        surface.DrawLine(9, 9, w - 9, h - 9)
-        surface.DrawLine(w - 9, 9, 9, h - 9)
+        DUIF.DrawRoundedBox(7, x, y, dw, dh, Color(220, 70, 70, 20 + (80 * self.HoverFrac)))
+        surface.SetDrawColor(245, 245, 250, 180 + (65 * self.HoverFrac))
+        surface.DrawLine(8, 8, w - 8, h - 8)
+        surface.DrawLine(w - 8, 8, 8, h - 8)
     end
 
-    return close
+    return btn
 end
