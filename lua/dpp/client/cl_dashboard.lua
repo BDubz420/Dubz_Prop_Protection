@@ -1,40 +1,31 @@
 DPP = DPP or {}
 DPP.UI = DPP.UI or {}
 
-surface.CreateFont("DPP.Title", {
-    font = "Roboto",
-    size = 30,
-    weight = 700,
-    antialias = true,
-})
+local function ensureConfig()
+    if not istable(DPP.Config) then
+        DPP.Config = istable(DPP.DefaultConfig) and DPP:DeepCopy(DPP.DefaultConfig) or { core = { masterEnable = true } }
+    end
 
-surface.CreateFont("DPP.Subtitle", {
-    font = "Roboto",
-    size = 19,
-    weight = 500,
-    antialias = true,
-})
+    DPP.Config.core = DPP.Config.core or {}
+    if DPP.Config.core.masterEnable == nil then
+        DPP.Config.core.masterEnable = true
+    end
+end
 
-surface.CreateFont("DPP.Nav", {
-    font = "Roboto",
-    size = 18,
-    weight = 600,
-    antialias = true,
-})
+local function safeFont(name, size, weight)
+    surface.CreateFont(name, {
+        font = "Tahoma",
+        size = size,
+        weight = weight,
+        antialias = true,
+    })
+end
 
-surface.CreateFont("DPP.Row", {
-    font = "Roboto",
-    size = 18,
-    weight = 500,
-    antialias = true,
-})
-
-surface.CreateFont("DPP.Small", {
-    font = "Roboto",
-    size = 16,
-    weight = 500,
-    antialias = true,
-})
+safeFont("DPP.Title", 30, 800)
+safeFont("DPP.Subtitle", 20, 600)
+safeFont("DPP.Nav", 18, 600)
+safeFont("DPP.Row", 18, 500)
+safeFont("DPP.Small", 16, 500)
 
 local NAV_CATEGORIES = {
     { code = "CORE", label = "Core System", key = "core" },
@@ -63,19 +54,21 @@ local KEY_MAP = {
 local function flattenSettings(key)
     local result = {}
     local sections = KEY_MAP[key] or {}
+
     for _, sectionKey in ipairs(sections) do
         local sec = DPP.Config and DPP.Config[sectionKey]
         if istable(sec) then
-            for k, v in pairs(sec) do
+            for settingKey, value in pairs(sec) do
                 result[#result + 1] = {
-                    path = sectionKey .. "." .. k,
+                    path = sectionKey .. "." .. settingKey,
                     section = sectionKey,
-                    key = k,
-                    value = v,
+                    key = settingKey,
+                    value = value,
                 }
             end
         end
     end
+
     table.sort(result, function(a, b) return a.path < b.path end)
     return result
 end
@@ -90,6 +83,35 @@ end
 local function styleButton(btn)
     btn:SetFont("DPP.Small")
     btn:SetTextColor(Color(225, 232, 245))
+end
+
+local function openTableEditor(item)
+    local fr = vgui.Create("DFrame")
+    fr:SetSize(ScrW() * 0.52, ScrH() * 0.66)
+    fr:Center()
+    fr:SetTitle(item.path)
+    fr:MakePopup()
+
+    local txt = vgui.Create("DTextEntry", fr)
+    txt:Dock(FILL)
+    txt:SetMultiline(true)
+    txt:SetFont("DPP.Small")
+    txt:SetText(util.TableToJSON(item.value, true) or "{}")
+
+    local save = vgui.Create("DButton", fr)
+    save:Dock(BOTTOM)
+    save:SetTall(36)
+    save:SetText("Save JSON")
+    styleButton(save)
+    save.DoClick = function()
+        local tbl = util.JSONToTable(txt:GetValue() or "")
+        if istable(tbl) then
+            DPP.Config[item.section][item.key] = tbl
+            fr:Close()
+        else
+            notification.AddLegacy("DPP: Invalid JSON", NOTIFY_ERROR, 3)
+        end
+    end
 end
 
 local function createControl(parent, item)
@@ -109,11 +131,12 @@ local function createControl(parent, item)
     name:SizeToContents()
 
     local valueType = type(item.value)
+
     if valueType == "boolean" then
         local cb = vgui.Create("DCheckBox", row)
         cb:SetValue(item.value and 1 or 0)
-        cb.OnChange = function(_, b)
-            DPP.Config[item.section][item.key] = b
+        cb.OnChange = function(_, value)
+            DPP.Config[item.section][item.key] = value
         end
         row.PerformLayout = function(self)
             cb:SetPos(self:GetWide() - 28, 15)
@@ -148,30 +171,7 @@ local function createControl(parent, item)
         btn:SetSize(120, 30)
         styleButton(btn)
         btn.DoClick = function()
-            local fr = vgui.Create("DFrame")
-            fr:SetSize(ScrW() * 0.52, ScrH() * 0.66)
-            fr:Center()
-            fr:SetTitle(item.path)
-            fr:MakePopup()
-
-            local txt = vgui.Create("DTextEntry", fr)
-            txt:Dock(FILL)
-            txt:SetMultiline(true)
-            txt:SetFont("DPP.Small")
-            txt:SetText(util.TableToJSON(item.value, true) or "{}")
-
-            local save = vgui.Create("DButton", fr)
-            save:Dock(BOTTOM)
-            save:SetTall(36)
-            save:SetText("Save JSON")
-            styleButton(save)
-            save.DoClick = function()
-                local tbl = util.JSONToTable(txt:GetValue() or "")
-                if istable(tbl) then
-                    DPP.Config[item.section][item.key] = tbl
-                    fr:Close()
-                end
-            end
+            openTableEditor(item)
         end
         row.PerformLayout = function(self)
             btn:SetPos(self:GetWide() - 134, 8)
@@ -181,7 +181,7 @@ local function createControl(parent, item)
     return row
 end
 
-local function openDashboard()
+local function buildDashboardVGUI()
     if IsValid(DPP.UI.Frame) then DPP.UI.Frame:Remove() end
 
     local frame = vgui.Create("DFrame")
@@ -214,7 +214,9 @@ local function openDashboard()
     local top = vgui.Create("DPanel", frame)
     top:SetPos(12, 78)
     top:SetSize(frame:GetWide() - 24, 52)
-    top.Paint = function(_, w, h) draw.RoundedBox(8, 0, 0, w, h, Color(24, 34, 48)) end
+    top.Paint = function(_, w, h)
+        draw.RoundedBox(8, 0, 0, w, h, Color(24, 34, 48))
+    end
 
     local search = vgui.Create("DTextEntry", top)
     search:SetPos(12, 10)
@@ -229,8 +231,8 @@ local function openDashboard()
     master:SetTextColor(Color(235, 240, 250))
     master:SetValue((DPP.Config.core and DPP.Config.core.masterEnable) and 1 or 0)
     master:SizeToContents()
-    master.OnChange = function(_, b)
-        DPP.Config.core.masterEnable = b
+    master.OnChange = function(_, value)
+        DPP.Config.core.masterEnable = value
     end
 
     local quick = vgui.Create("DComboBox", top)
@@ -268,9 +270,9 @@ local function openDashboard()
     right.Paint = function(_, w, h)
         draw.RoundedBox(8, 0, 0, w, h, Color(22, 31, 44))
         draw.SimpleText("Live Monitor", "DPP.Subtitle", 14, 24, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        draw.SimpleText("Violations: " .. tostring(DPP.Client.Live.violations or 0), "DPP.Small", 14, 62, Color(255, 140, 140))
-        draw.SimpleText("Actions: " .. tostring(DPP.Client.Live.actions or 0), "DPP.Small", 14, 90, Color(168, 216, 255))
-        draw.SimpleText("Entities Processed: " .. tostring(DPP.Client.Live.entitiesProcessed or 0), "DPP.Small", 14, 118, Color(165, 255, 171))
+        draw.SimpleText("Violations: " .. tostring(DPP.Client.Live and DPP.Client.Live.violations or 0), "DPP.Small", 14, 62, Color(255, 140, 140))
+        draw.SimpleText("Actions: " .. tostring(DPP.Client.Live and DPP.Client.Live.actions or 0), "DPP.Small", 14, 90, Color(168, 216, 255))
+        draw.SimpleText("Entities Processed: " .. tostring(DPP.Client.Live and DPP.Client.Live.entitiesProcessed or 0), "DPP.Small", 14, 118, Color(165, 255, 171))
     end
 
     local main = vgui.Create("DPanel", frame)
@@ -311,7 +313,6 @@ local function openDashboard()
         end
         b.DoClick = function()
             activeCategory = cat.key
-            main:InvalidateLayout(true)
             rebuildMain()
         end
         y = y + 46
@@ -319,6 +320,112 @@ local function openDashboard()
 
     search.OnValueChange = rebuildMain
     rebuildMain()
+end
+
+local function frameworkFromGlobals()
+    return rawget(_G, "DPP_UI") or rawget(_G, "DubzUI") or rawget(_G, "DubzUIFramework")
+end
+
+local function buildWithFrameworkBuilder(fw)
+    if not isfunction(fw.BuildDPPDashboard) then return false end
+    local ok, err = xpcall(function()
+        fw.BuildDPPDashboard(DPP)
+    end, debug.traceback)
+    if not ok then
+        MsgC(Color(255, 120, 120), "[DPP] Framework BuildDPPDashboard failed: " .. tostring(err) .. "\n")
+        return false
+    end
+    return true
+end
+
+local function buildWithFrameworkAPI(fw)
+    if not isfunction(fw.CreateWindow) then return false end
+
+    local ok, err = xpcall(function()
+        local window = fw.CreateWindow({
+            title = "Dubz Prop Protection",
+            subtitle = "namespace: DPP",
+            width = ScrW() * 0.90,
+            height = ScrH() * 0.90,
+        })
+
+        if not window then error("CreateWindow returned nil") end
+        if not isfunction(window.AddSidebarTab) or not isfunction(window.SetContentBuilder) then
+            error("window missing AddSidebarTab/SetContentBuilder API")
+        end
+
+        local active = NAV_CATEGORIES[1] and NAV_CATEGORIES[1].key or "core"
+
+        for _, cat in ipairs(NAV_CATEGORIES) do
+            window:AddSidebarTab(cat.key, cat.label, function()
+                active = cat.key
+                if isfunction(window.RebuildContent) then
+                    window:RebuildContent()
+                end
+            end)
+        end
+
+        window:SetContentBuilder(function(parent, searchQuery)
+            if not parent then return end
+            if parent.Clear then parent:Clear() end
+            local query = string.lower(string.Trim(searchQuery or ""))
+            for _, item in ipairs(flattenSettings(active)) do
+                if query == "" or string.find(string.lower(item.path), query, 1, true) then
+                    createControl(parent, item)
+                end
+            end
+        end)
+
+        if isfunction(window.SetLiveStatsProvider) then
+            window:SetLiveStatsProvider(function()
+                local live = DPP.Client.Live or {}
+                return {
+                    violations = live.violations or 0,
+                    actions = live.actions or 0,
+                    entitiesProcessed = live.entitiesProcessed or 0,
+                }
+            end)
+        end
+
+        if isfunction(window.SetOnSave) then
+            window:SetOnSave(function()
+                DPP.Client.SendAction("save_config", util.TableToJSON(DPP.Config, false, true) or "{}")
+            end)
+        end
+
+        if isfunction(window.Open) then
+            window:Open()
+        end
+    end, debug.traceback)
+
+    if not ok then
+        MsgC(Color(255, 120, 120), "[DPP] Framework API integration failed: " .. tostring(err) .. "\n")
+        return false
+    end
+
+    return true
+end
+
+local function tryBuildWithExternalFramework()
+    local fw = frameworkFromGlobals()
+    if not fw then return false end
+
+    if buildWithFrameworkBuilder(fw) then return true end
+    if buildWithFrameworkAPI(fw) then return true end
+
+    return false
+end
+
+local function openDashboard()
+    ensureConfig()
+
+    if tryBuildWithExternalFramework() then return end
+
+    local ok, err = xpcall(buildDashboardVGUI, debug.traceback)
+    if not ok then
+        MsgC(Color(255, 90, 90), "[DPP] UI open failed: " .. tostring(err) .. "\n")
+        notification.AddLegacy("DPP UI failed to open. Check console.", NOTIFY_ERROR, 4)
+    end
 end
 
 net.Receive(DPP.NET.ACTION, function()

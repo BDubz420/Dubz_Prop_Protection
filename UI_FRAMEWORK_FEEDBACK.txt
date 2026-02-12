@@ -1,0 +1,44 @@
+Dubz Prop Protection - UI Framework Integration Feedback
+=======================================================
+
+Status in this repository snapshot
+----------------------------------
+I still cannot see standalone framework source files in this checkout (based on `rg --files`).
+Only DPP addon files are present.
+
+What was integrated now
+-----------------------
+I upgraded `lua/dpp/client/cl_dashboard.lua` to support framework integration in two robust ways:
+
+1) Direct builder mode
+- If global `DPP_UI` / `DubzUI` / `DubzUIFramework` exists and exposes:
+  - `BuildDPPDashboard(DPP)`
+- DPP calls it directly.
+
+2) API adapter mode
+- If the framework exposes:
+  - `CreateWindow(opts)`
+- DPP attempts a structured integration with these optional methods on the returned window:
+  - `AddSidebarTab(id, label, onClick)`
+  - `SetContentBuilder(function(parent, searchQuery) ... end)`
+  - `RebuildContent()`
+  - `SetLiveStatsProvider(function() ... end)`
+  - `SetOnSave(function() ... end)`
+  - `Open()`
+
+Both framework paths are protected by `xpcall` so bad framework calls do not crash the game.
+If framework integration fails, DPP falls back to the internal stable VGUI dashboard.
+
+Recommended framework changes (to make integration perfect)
+-----------------------------------------------------------
+1) Publish a single documented global namespace (prefer: `DPP_UI`).
+2) Keep the `CreateWindow` contract stable with the methods listed above.
+3) Ensure content containers passed to `SetContentBuilder` are standard VGUI panels that support `:Clear()`.
+4) Provide explicit lifecycle hooks (`OnOpen`, `OnClose`, `OnThemeChanged`) for addons.
+5) Provide a version string (example: `DPP_UI.VERSION = "x.y.z"`) so addons can adapt features safely.
+6) Provide a minimal integration example file for external addons.
+
+Next step for exact binding
+---------------------------
+If you confirm the exact framework file path/API names you uploaded, I can hard-bind DPP to those exact methods
+(and remove adapter assumptions) in one pass.
